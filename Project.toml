@@ -1,0 +1,18 @@
+name = "PulseqReader"
+uuid = "0afa8a8d-8bbf-47e8-a08b-19c259665ddd"
+authors = ["Oscar van der Heide <o.vanderheide@umcutrecht.nl>"]
+version = "0.1.0"
+
+[deps]
+Scanf = "6ef1bc8b-493b-44e1-8d40-549aa65c4b41"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[compat]
+Scanf = "0.5.4"
+StructArrays = "0.7.0"
+StyledStrings = "1.11.0"
+UnicodePlots = "3.7.2"
+Unitful = "1.22.0"
