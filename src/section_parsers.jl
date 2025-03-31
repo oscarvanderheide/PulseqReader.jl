@@ -1,7 +1,8 @@
 """
     parse_version_section(lines)
 
-Parses the [VERSION] section of the sequence file into Julia's built-in `VersionNumber` type.
+Parses the [VERSION] section of the sequence file into Julia's built-in
+`VersionNumber` type.
 """
 function parse_version_section(lines)
     section_content = get_section(lines, "VERSION")
@@ -25,7 +26,8 @@ end
 """
     parse_blocks_section(lines)
 
-Parses the [BLOCKS] section of the sequence file into a `StructArray` of `Block` structs.
+Parses the [BLOCKS] section of the sequence file into a `StructArray` of `Block`
+structs.
 """
 function parse_blocks_section(lines)
     section_lines = get_section(lines, "BLOCKS")
@@ -34,7 +36,8 @@ function parse_blocks_section(lines)
     sizehint!(blocks, length(section_lines))
 
     for line in section_lines
-        _, dur, rf, gx, gy, gz, adc, delay, ext = scanf(line, format_string, types...)
+        _, dur, rf, gx, gy, gz, adc, delay, ext =
+            scanf(line, format_string, types...)
         push!(blocks, Block(dur, rf, gx, gy, gz, adc, delay, ext))
     end
 
@@ -44,7 +47,8 @@ end
 """
     parse_rf_section(lines)
 
-Parses the [RF] section of the sequence file into a `StructArray` of `RF` structs.
+Parses the [RF] section of the sequence file into a `StructArray` of `RF`
+structs.
 """
 function parse_rf_section(lines)
     section_lines = get_section(lines, "RF")
@@ -53,16 +57,20 @@ function parse_rf_section(lines)
     sizehint!(rf_events, length(section_lines))
 
     for line in section_lines
-        _, amplitude, mag_id, phase_id, time_shape_id, delay, frequency, phase = scanf(line, format_string, types...)
-        push!(rf_events, RF(
-            Hz(amplitude),
-            mag_id,
-            phase_id,
-            time_shape_id,
-            μs(delay),
-            Hz(frequency),
-            rad(phase)
-        ))
+        _, amplitude, mag_id, phase_id, time_shape_id, delay, frequency, phase =
+            scanf(line, format_string, types...)
+        push!(
+            rf_events,
+            RF(
+                Hz(amplitude),
+                mag_id,
+                phase_id,
+                time_shape_id,
+                μs(delay),
+                Hz(frequency),
+                rad(phase),
+            ),
+        )
     end
 
     return StructArray(rf_events)
@@ -71,7 +79,8 @@ end
 """
     parse_trap_section(lines)
 
-Parses the [TRAP] section of the sequence file into a `StructArray` of `TRAP` structs.
+Parses the [TRAP] section of the sequence file into a `StructArray` of `TRAP`
+structs.
 """
 function parse_trap_section(lines)
     section_lines = get_section(lines, "TRAP")
@@ -80,14 +89,12 @@ function parse_trap_section(lines)
     sizehint!(trap_events, length(section_lines))
 
     for line in section_lines
-        _, amplitude, rise, flat, fall, delay = scanf(line, format_string, types...)
-        push!(trap_events, TRAP(
-            Hzm⁻¹(amplitude),
-            μs(rise),
-            μs(flat),
-            μs(fall),
-            μs(delay)
-        ))
+        _, amplitude, rise, flat, fall, delay =
+            scanf(line, format_string, types...)
+        push!(
+            trap_events,
+            TRAP(Hzm⁻¹(amplitude), μs(rise), μs(flat), μs(fall), μs(delay)),
+        )
     end
 
     return StructArray(trap_events)
@@ -96,7 +103,8 @@ end
 """
     parse_adc_section(lines)
 
-Parses the [ADC] section of the sequence file into a `StructArray` of `ADC` structs.
+Parses the [ADC] section of the sequence file into a `StructArray` of `ADC`
+structs.
 """
 function parse_adc_section(lines)
     section_lines = get_section(lines, "ADC")
@@ -105,14 +113,12 @@ function parse_adc_section(lines)
     sizehint!(adc_events, length(section_lines))
 
     for line in section_lines
-        _, num, dwell, delay, frequency, phase = scanf(line, format_string, types...)
-        push!(adc_events, ADC(
-            num,
-            ns(dwell),
-            μs(delay),
-            Hz(frequency),
-            rad(phase)
-        ))
+        _, num, dwell, delay, frequency, phase =
+            scanf(line, format_string, types...)
+        push!(
+            adc_events,
+            ADC(num, ns(dwell), μs(delay), Hz(frequency), rad(phase)),
+        )
     end
 
     return StructArray(adc_events)
@@ -121,7 +127,8 @@ end
 """
     parse_extensions_section(lines)
 
-Parses the [EXTENSIONS] section of the sequence file into a `StructArray` of `Extension` structs.
+Parses the [EXTENSIONS] section of the sequence file into a `StructArray` of
+`Extension` structs.
 """
 function parse_extensions_section(lines)
     section_lines = get_section(lines, "EXTENSIONS")
@@ -140,7 +147,8 @@ end
 """
     parse_shapes_section(lines)
 
-Parses the [SHAPES] section of the sequence file into a `StructArray` of `Shape` structs.
+Parses the [SHAPES] section of the sequence file into a `StructArray` of `Shape`
+structs.
 """
 function parse_shapes_section(lines)
     section_lines = get_section(lines, "SHAPES")
@@ -151,7 +159,7 @@ function parse_shapes_section(lines)
     num_shapes = length(shape_id_indices)
 
 
-    for i in 1:num_shapes
+    for i = 1:num_shapes
         # Extract shape_id
         shape_id_line = section_lines[shape_id_indices[i]]
         _, shape_id_str = split(strip(shape_id_line))
@@ -165,11 +173,12 @@ function parse_shapes_section(lines)
         # Parse sample values
         start_samples = shape_id_indices[i] + 2
         end_samples =
-            i < num_shapes ?
-            shape_id_indices[i+1] - 1 :
-            length(section_lines)
+            i < num_shapes ? shape_id_indices[i+1] - 1 : length(section_lines)
 
-        samples = [parse(Float64, strip(section_lines[j])) for j in start_samples:end_samples]
+        samples = [
+            parse(Float64, strip(section_lines[j])) for
+            j = start_samples:end_samples
+        ]
 
         push!(shapes, Shape(num_samples, samples))
     end

@@ -21,7 +21,9 @@ include("section_parsers.jl")
 
 Reads a Pulseq sequence file and returns a `Sequence` object containing the parsed data.
 
-Note that this function does not check integrity or validity of the .seq file. It does not do any processing either: it's intended to make the contents of the .seq file available within Julia with a convenient syntax.
+Note that this function does not check integrity or validity of the .seq file.
+It does not do any processing either: it's intended to make the contents of the
+.seq file available within Julia with a convenient syntax.
 
 # Example usage:
 
@@ -55,10 +57,13 @@ function read_pulseq(filename::String)
         parse_rf_section(lines),
         parse_adc_section(lines),
         parse_extensions_section(lines),
-        parse_shapes_section(lines)
+        parse_shapes_section(lines),
     )
 end
 
+#! format: off
+# JuliaFormatter somehow doesn't properly recognize the public keyword as of yet
 public read_pulseq
+#! format: on
 
 end

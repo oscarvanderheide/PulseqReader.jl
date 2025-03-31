@@ -3,12 +3,15 @@
 
 Extracts the lines corresponding to a specific section in the sequence file.
 
-- Removes empty lines and comment lines (lines starting with #).
-- For sections like VERSION and DEFINITIONS, joins the lines into a single string.
+  - Removes empty lines and comment lines (lines starting with #).
+  - For sections like VERSION and DEFINITIONS, joins the lines into a single
+    string.
 """
 function get_section(lines::Vector{String}, section_name::String)
     section_range = get_section_range(lines, section_name)
-    section = [line for line in lines[section_range] if !is_empty_or_comment_line(line)]
+    section = [
+        line for line in lines[section_range] if !is_empty_or_comment_line(line)
+    ]
 
     if section_name ∈ ["VERSION", "DEFINITIONS"]
         section = join(section, " ")
@@ -20,16 +23,18 @@ end
 """
     get_section_range(section_name::String)
 
-Sections are defined by lines starting with a square bracket (e.g., [RF], [ADC], etc.). The function returns a range of line indices that correspond to the specified section.
+Sections are defined by lines starting with a square bracket (e.g., [RF], [ADC],
+etc.). The function returns a range of line indices that correspond to the
+specified section.
 """
 function get_section_range(lines, section_name::String)
 
     println("Parsing section: ", section_name)
     start_section = findfirst(contains("[$section_name]"), lines) + 1
 
-    # The next line with "[" indicates the start of the next section
-    # Note that [SIGNATURE] always comes last and is not parsed so we 
-    # don't need to worry about the end of the file
+    # The next line with "[" indicates the start of the next section Note that
+    # [SIGNATURE] always comes last and is not parsed so we don't need to worry
+    # about the end of the file
     end_section = findnext(contains("["), lines, start_section) - 1
 
     return start_section:end_section
@@ -38,7 +43,8 @@ end
 """
     is_empty_or_comment_line(line)
 
-Checks if a line is empty or a comment line (starts with #). This check is used to skip lines that do not contain relevant data.
+Checks if a line is empty or a comment line (starts with #). This check is used
+to skip lines that do not contain relevant data.
 """
 function is_empty_or_comment_line(line::AbstractString)
     return isempty(line) || startswith(line, "#")
@@ -47,10 +53,12 @@ end
 """
     get_scanf_args(section::AbstractString)
 
-Returns information (`format_string` and `types`) needed to parse the specified section of the sequence file with `scanf`.
+Returns information (`format_string` and `types`) needed to parse the specified
+section of the sequence file with `scanf`.
 
-The `format_string` contains the format string for `Scanf.scanf` converted `Scanf.Format`. 
-The `types` field contains the types for each of the extracted values.
+The `format_string` contains the format string for `Scanf.scanf` converted
+`Scanf.Format`. The `types` field contains the types for each of the extracted
+values.
 """
 function get_scanf_args(section::AbstractString)
     if section == "VERSION"
@@ -58,7 +66,8 @@ function get_scanf_args(section::AbstractString)
         format_string = "%*s %d %*s %d %*s %d"
         types = (Int, Int, Int)
     elseif section == "DEFINITIONS"
-        # AdcRasterTime, BlockDurationRaster, GradientRasterTime, RadiofrequencyRasterTime, TotalDuration
+        # AdcRasterTime, BlockDurationRaster, GradientRasterTime,
+        # RadiofrequencyRasterTime, TotalDuration
         format_string = "%*s %f %*s %f %*s %f %*s %f %*s %f"
         types = (Float64, Float64, Float64, Float64, Float64)
     elseif section == "BLOCKS"
@@ -93,12 +102,18 @@ import PulseqReader: Shape
 """
     decode(s::Shape)
 
-Decompresses a compressed `Shape` by decoding the derivative in a run-length compressed format.
+Decompresses a compressed `Shape` by decoding the derivative in a run-length
+compressed format.
 
-- The function takes a `Shape` object as input and returns a new `Shape` object with the decompressed samples.
-- The function checks if the shape is compressed by comparing the number of samples in the shape with the length of the samples array. If they are equal, it returns the original shape.
-- The decoding algorithm checks if a value is repeated in the compressed shape. If it is, it reads the number of repetitions from the next value in the array and fills the decoded shape with the current derivative value.
-- The first sample of the compressed shape is always the actual first sample.
+  - The function takes a `Shape` object as input and returns a new `Shape`
+    object with the decompressed samples.
+  - The function checks if the shape is compressed by comparing the number of
+    samples in the shape with the length of the samples array. If they are
+    equal, it returns the original shape.
+  - The decoding algorithm checks if a value is repeated in the compressed
+    shape. If it is, it reads the number of repetitions from the next value in
+    the array and fills the decoded shape with the current derivative value.
+  - The first sample of the compressed shape is always the actual first sample.
 """
 function decode(s::Shape)
 
@@ -132,7 +147,7 @@ function decode(s::Shape)
         end
 
         # Fill the decoded shape array with the current derivative value
-        for j in 1:repetitions
+        for j = 1:repetitions
             previous_value = idx > 1 ? decoded_shape[idx-1] : 0.0
             decoded_shape[idx] = previous_value + current_derivative
             idx += 1
