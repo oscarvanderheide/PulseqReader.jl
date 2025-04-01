@@ -16,3 +16,9 @@ StructArrays = "0.7.0"
 StyledStrings = "1.11.0"
 UnicodePlots = "3.7.2"
 Unitful = "1.22.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
