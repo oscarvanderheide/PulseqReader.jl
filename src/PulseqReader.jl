@@ -46,11 +46,11 @@ function read_pulseq(filename::String)
     version = parse_version_section(lines)
 
     if version < v"1.4"
-        @warn "This code was written assuming Pulseq version >= v1.4."
+        @warn "This code was written assuming Pulseq version >= v1.4"
     end
 
     return Sequence(
-        parse_version_section(lines),
+        version,
         parse_definitions_section(lines),
         parse_blocks_section(lines),
         parse_trap_section(lines),
