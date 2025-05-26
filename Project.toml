@@ -12,7 +12,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 Scanf = "0.5.4"
-StructArrays = "0.7.0"
+StructArrays = "0.6, 0.7"
 StyledStrings = "1.11.0"
 UnicodePlots = "3.7.2"
 Unitful = "1.22.0"
