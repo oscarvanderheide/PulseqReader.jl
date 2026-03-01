@@ -29,7 +29,6 @@ specified section.
 """
 function get_section_range(lines, section_name::String)
 
-    println("Parsing section: ", section_name)
     start_section = findfirst(contains("[$section_name]"), lines) + 1
 
     # The next line with "[" indicates the start of the next section Note that
@@ -70,10 +69,6 @@ function get_scanf_args(section::AbstractString)
         # RadiofrequencyRasterTime, TotalDuration
         format_string = "%*s %f %*s %f %*s %f %*s %f %*s %f"
         types = (Float64, Float64, Float64, Float64, Float64)
-    elseif section == "BLOCKS"
-        # dur, rf, gx, gy, gz, adc, delay, ext
-        format_string = "%*d %d %d %d %d %d %d %d %d"
-        types = (Int, Int, Int, Int, Int, Int, Int, Int)
     elseif section == "RF"
         # amplitude, mag_id, phase_id, time_shape_id, delay, frequency, phase
         format_string = "%*d %f %d %d %d %f %f %f"
@@ -86,10 +81,6 @@ function get_scanf_args(section::AbstractString)
         # num, dwell, delay, frequency, phase
         format_string = "%*d %d %f %f %f %f"
         types = (Int, Float64, Float64, Float64, Float64)
-    elseif section == "EXTENSIONS"
-        # ext_id, ext_type, ext_value
-        format_string = "%*d %d %d %d"
-        types = (Int, Int, Int)
     else
         error("Unknown section: $section")
     end
