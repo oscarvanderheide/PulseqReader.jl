@@ -42,8 +42,9 @@ seq.rf.amplitude
 function read_pulseq(filename::String)
 
     lines = readlines(filename)
+    idx = build_section_index(lines)
 
-    version = parse_version_section(lines)
+    version = parse_version_section(lines, idx)
 
     if version < v"1.4"
         @warn "This code was written assuming Pulseq version >= v1.4"
@@ -51,13 +52,13 @@ function read_pulseq(filename::String)
 
     return Sequence(
         version,
-        parse_definitions_section(lines),
-        parse_blocks_section(lines),
-        parse_trap_section(lines),
-        parse_rf_section(lines),
-        parse_adc_section(lines),
-        parse_extensions_section(lines),
-        parse_shapes_section(lines),
+        parse_definitions_section(lines, idx),
+        parse_blocks_section(lines, idx),
+        parse_trap_section(lines, idx),
+        parse_rf_section(lines, idx),
+        parse_adc_section(lines, idx),
+        parse_extensions_section(lines, idx),
+        parse_shapes_section(lines, idx),
     )
 end
 

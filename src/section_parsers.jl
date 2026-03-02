@@ -1,37 +1,43 @@
 """
-    parse_version_section(lines)
+    parse_version_section(lines, idx)
 
 Parses the [VERSION] section of the sequence file into Julia's built-in
 `VersionNumber` type.
 """
-function parse_version_section(lines)
-    section_content = get_section(lines, "VERSION")
+function parse_version_section(lines, idx)
+    section_content = get_section(lines, idx["VERSION"], true)
     format_string, types = get_scanf_args("VERSION")
     _, version_values... = scanf(section_content, format_string, types...)
     return VersionNumber(version_values...)
 end
 
 """
-    parse_definitions_section(lines)
+    parse_definitions_section(lines, idx)
 
 Parses the [DEFINITIONS] section of the sequence file.
 """
-function parse_definitions_section(lines)
-    section_content = get_section(lines, "DEFINITIONS")
+function parse_definitions_section(lines, idx)
+    section_content = get_section(lines, idx["DEFINITIONS"], true)
     format_string, types = get_scanf_args("DEFINITIONS")
     _, definition_values... = scanf(section_content, format_string, types...)
     return Definitions(definition_values...)
 end
 
 """
-    parse_blocks_section(lines)
+    parse_blocks_section(lines, idx)
 
 Parses the [BLOCKS] section of the sequence file into a `StructArray` of `Block`
 structs.
 """
-function parse_blocks_section(lines)
-    section_lines = get_section(lines, "BLOCKS")
-    n = length(section_lines)
+function parse_blocks_section(lines, idx)
+    range = idx["BLOCKS"]
+
+    # Count data lines first
+    n = 0
+    for i in range
+        line = lines[i]
+        !isempty(line) && line[1] != '#' && (n += 1)
+    end
 
     # Pre-allocate column arrays
     dur = Vector{Int}(undef, n)
@@ -43,31 +49,40 @@ function parse_blocks_section(lines)
     delay = Vector{Int}(undef, n)
     ext = Vector{Int}(undef, n)
 
-    for i in 1:n
-        parts = split(section_lines[i])
-        np = length(parts)
-        # Skip first column (block index), parse remaining fields, pad with 0
-        dur[i]   = np >= 2 ? parse(Int, parts[2]) : 0
-        rf[i]    = np >= 3 ? parse(Int, parts[3]) : 0
-        gx[i]    = np >= 4 ? parse(Int, parts[4]) : 0
-        gy[i]    = np >= 5 ? parse(Int, parts[5]) : 0
-        gz[i]    = np >= 6 ? parse(Int, parts[6]) : 0
-        adc[i]   = np >= 7 ? parse(Int, parts[7]) : 0
-        delay[i] = np >= 8 ? parse(Int, parts[8]) : 0
-        ext[i]   = np >= 9 ? parse(Int, parts[9]) : 0
+    row = 0
+    for i in range
+        line = lines[i]
+        (isempty(line) || line[1] == '#') && continue
+        row += 1
+
+        len = ncodeunits(line)
+
+        # Skip first field (block index)
+        pos = skip_whitespace(line, 1)
+        _, pos = parse_inline_int(line, pos)
+
+        # Parse up to 8 fields, defaulting to 0 if line is shorter
+        @inbounds dur[row], pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds rf[row],  pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds gx[row],  pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds gy[row],  pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds gz[row],  pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds adc[row], pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds delay[row], pos = pos <= len ? parse_inline_int(line, pos) : (0, pos)
+        @inbounds ext[row],   _   = pos <= len ? parse_inline_int(line, pos) : (0, pos)
     end
 
     return StructArray{Block}((dur, rf, gx, gy, gz, adc, delay, ext))
 end
 
 """
-    parse_rf_section(lines)
+    parse_rf_section(lines, idx)
 
 Parses the [RF] section of the sequence file into a `StructArray` of `RF`
 structs.
 """
-function parse_rf_section(lines)
-    section_lines = get_section(lines, "RF")
+function parse_rf_section(lines, idx)
+    section_lines = get_section(lines, idx["RF"])
     n = length(section_lines)
 
     amplitude     = Vector{Hz}(undef, n)
@@ -79,27 +94,32 @@ function parse_rf_section(lines)
     phase         = Vector{rad}(undef, n)
 
     for i in 1:n
-        parts = split(section_lines[i])
-        amplitude[i]     = Hz(parse(Float64, parts[2]))
-        mag_id[i]        = parse(Int, parts[3])
-        phase_id[i]      = parse(Int, parts[4])
-        time_shape_id[i] = parse(Int, parts[5])
-        delay[i]         = μs(parse(Float64, parts[6]))
-        freq[i]          = Hz(parse(Float64, parts[7]))
-        phase[i]         = rad(parse(Float64, parts[8]))
+        line = section_lines[i]
+        _, pos = parse_inline_int(line, 1)          # skip id
+        v, pos = parse_inline_float(line, pos)
+        amplitude[i] = Hz(v)
+        mag_id[i], pos = parse_inline_int(line, pos)
+        phase_id[i], pos = parse_inline_int(line, pos)
+        time_shape_id[i], pos = parse_inline_int(line, pos)
+        v, pos = parse_inline_float(line, pos)
+        delay[i] = μs(v)
+        v, pos = parse_inline_float(line, pos)
+        freq[i] = Hz(v)
+        v, _ = parse_inline_float(line, pos)
+        phase[i] = rad(v)
     end
 
     return StructArray{RF}((amplitude, mag_id, phase_id, time_shape_id, delay, freq, phase))
 end
 
 """
-    parse_trap_section(lines)
+    parse_trap_section(lines, idx)
 
 Parses the [TRAP] section of the sequence file into a `StructArray` of `TRAP`
 structs.
 """
-function parse_trap_section(lines)
-    section_lines = get_section(lines, "TRAP")
+function parse_trap_section(lines, idx)
+    section_lines = get_section(lines, idx["TRAP"])
     n = length(section_lines)
 
     amplitude = Vector{Hzm⁻¹}(undef, n)
@@ -109,25 +129,31 @@ function parse_trap_section(lines)
     delay     = Vector{μs}(undef, n)
 
     for i in 1:n
-        parts = split(section_lines[i])
-        amplitude[i] = Hzm⁻¹(parse(Float64, parts[2]))
-        rise[i]      = μs(parse(Float64, parts[3]))
-        flat[i]      = μs(parse(Float64, parts[4]))
-        fall[i]      = μs(parse(Float64, parts[5]))
-        delay[i]     = μs(parse(Float64, parts[6]))
+        line = section_lines[i]
+        _, pos = parse_inline_int(line, 1)          # skip id
+        v, pos = parse_inline_float(line, pos)
+        amplitude[i] = Hzm⁻¹(v)
+        v, pos = parse_inline_float(line, pos)
+        rise[i] = μs(v)
+        v, pos = parse_inline_float(line, pos)
+        flat[i] = μs(v)
+        v, pos = parse_inline_float(line, pos)
+        fall[i] = μs(v)
+        v, _ = parse_inline_float(line, pos)
+        delay[i] = μs(v)
     end
 
     return StructArray{TRAP}((amplitude, rise, flat, fall, delay))
 end
 
 """
-    parse_adc_section(lines)
+    parse_adc_section(lines, idx)
 
 Parses the [ADC] section of the sequence file into a `StructArray` of `ADC`
 structs.
 """
-function parse_adc_section(lines)
-    section_lines = get_section(lines, "ADC")
+function parse_adc_section(lines, idx)
+    section_lines = get_section(lines, idx["ADC"])
     n = length(section_lines)
 
     num   = Vector{Int}(undef, n)
@@ -137,25 +163,30 @@ function parse_adc_section(lines)
     phase = Vector{rad}(undef, n)
 
     for i in 1:n
-        parts = split(section_lines[i])
-        num[i]   = parse(Int, parts[2])
-        dwell[i] = ns(parse(Float64, parts[3]))
-        delay[i] = μs(parse(Float64, parts[4]))
-        freq[i]  = Hz(parse(Float64, parts[5]))
-        phase[i] = rad(parse(Float64, parts[6]))
+        line = section_lines[i]
+        _, pos = parse_inline_int(line, 1)          # skip id
+        num[i], pos = parse_inline_int(line, pos)
+        v, pos = parse_inline_float(line, pos)
+        dwell[i] = ns(v)
+        v, pos = parse_inline_float(line, pos)
+        delay[i] = μs(v)
+        v, pos = parse_inline_float(line, pos)
+        freq[i] = Hz(v)
+        v, _ = parse_inline_float(line, pos)
+        phase[i] = rad(v)
     end
 
     return StructArray{ADC}((num, dwell, delay, freq, phase))
 end
 
 """
-    parse_extensions_section(lines)
+    parse_extensions_section(lines, idx)
 
 Parses the [EXTENSIONS] section of the sequence file into a `StructArray` of
 `Extension` structs.
 """
-function parse_extensions_section(lines)
-    section_lines = get_section(lines, "EXTENSIONS")
+function parse_extensions_section(lines, idx)
+    section_lines = get_section(lines, idx["EXTENSIONS"])
 
     type    = Int[]
     ref     = Int[]
@@ -181,13 +212,13 @@ function parse_extensions_section(lines)
 end
 
 """
-    parse_shapes_section(lines)
+    parse_shapes_section(lines, idx)
 
 Parses the [SHAPES] section of the sequence file into a `StructArray` of `Shape`
 structs.
 """
-function parse_shapes_section(lines)
-    section_lines = get_section(lines, "SHAPES")
+function parse_shapes_section(lines, idx)
+    section_lines = get_section(lines, idx["SHAPES"])
     shapes = Shape[]
 
     # Find indices of lines containing "shape_id"

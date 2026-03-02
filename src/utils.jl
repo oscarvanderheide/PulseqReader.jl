@@ -1,42 +1,45 @@
 """
-    get_section(lines::Vector{String}, section_name::String)
+    build_section_index(lines)
 
-Extracts the lines corresponding to a specific section in the sequence file.
-
-  - Removes empty lines and comment lines (lines starting with #).
-  - For sections like VERSION and DEFINITIONS, joins the lines into a single
-    string.
+Scans the file lines once and returns a Dict mapping section names to their
+line ranges (excluding the header line itself).
 """
-function get_section(lines::Vector{String}, section_name::String)
-    section_range = get_section_range(lines, section_name)
-    section = [
-        line for line in lines[section_range] if !is_empty_or_comment_line(line)
-    ]
-
-    if section_name ∈ ["VERSION", "DEFINITIONS"]
-        section = join(section, " ")
+function build_section_index(lines::Vector{String})
+    # Find all section header positions in a single pass
+    headers = Tuple{String,Int}[]
+    for i in eachindex(lines)
+        line = lines[i]
+        if !isempty(line) && line[1] == '['
+            # Extract section name between [ and ]
+            j = findfirst(']', line)
+            j !== nothing && push!(headers, (line[2:j-1], i))
+        end
     end
 
-    return section
+    index = Dict{String,UnitRange{Int}}()
+    for k in 1:length(headers)-1
+        name, start = headers[k]
+        _, next_start = headers[k+1]
+        index[name] = (start + 1):(next_start - 1)
+    end
+    # Last section goes to end of file
+    if !isempty(headers)
+        name, start = headers[end]
+        index[name] = (start + 1):length(lines)
+    end
+
+    return index
 end
 
 """
-    get_section_range(section_name::String)
+    get_section(lines, range, join_lines=false)
 
-Sections are defined by lines starting with a square bracket (e.g., [RF], [ADC],
-etc.). The function returns a range of line indices that correspond to the
-specified section.
+Extracts non-empty, non-comment lines from the given range.
+If `join_lines` is true, joins them into a single string (for VERSION/DEFINITIONS).
 """
-function get_section_range(lines, section_name::String)
-
-    start_section = findfirst(contains("[$section_name]"), lines) + 1
-
-    # The next line with "[" indicates the start of the next section Note that
-    # [SIGNATURE] always comes last and is not parsed so we don't need to worry
-    # about the end of the file
-    end_section = findnext(contains("["), lines, start_section) - 1
-
-    return start_section:end_section
+function get_section(lines::Vector{String}, range::UnitRange{Int}, join_lines::Bool=false)
+    section = [line for line in @view(lines[range]) if !is_empty_or_comment_line(line)]
+    join_lines ? join(section, " ") : section
 end
 
 """
@@ -46,7 +49,65 @@ Checks if a line is empty or a comment line (starts with #). This check is used
 to skip lines that do not contain relevant data.
 """
 function is_empty_or_comment_line(line::AbstractString)
-    return isempty(line) || startswith(line, "#")
+    return isempty(line) || line[1] == '#'
+end
+
+# --- Zero-allocation inline parsers ---
+
+"""
+    skip_whitespace(s, pos)
+
+Advance `pos` past any ASCII whitespace in string `s`.
+"""
+@inline function skip_whitespace(s::String, pos::Int)
+    @inbounds while pos <= ncodeunits(s) && (codeunit(s, pos) == 0x20 || codeunit(s, pos) == 0x09)
+        pos += 1
+    end
+    return pos
+end
+
+"""
+    parse_inline_int(s, pos) -> (value, next_pos)
+
+Parse an integer directly from string bytes starting at `pos`.
+Returns the parsed value and the position after the integer.
+"""
+@inline function parse_inline_int(s::String, pos::Int)
+    pos = skip_whitespace(s, pos)
+    neg = false
+    len = ncodeunits(s)
+    @inbounds if pos <= len && codeunit(s, pos) == 0x2d  # '-'
+        neg = true
+        pos += 1
+    end
+    val = 0
+    @inbounds while pos <= len
+        d = codeunit(s, pos) - 0x30
+        d > 0x09 && break
+        val = val * 10 + d
+        pos += 1
+    end
+    return neg ? -val : val, pos
+end
+
+"""
+    parse_inline_float(s, pos) -> (value, next_pos)
+
+Parse a float directly from string bytes starting at `pos`.
+Uses `parse(Float64, ...)` on the token but avoids allocating a `split` array.
+"""
+@inline function parse_inline_float(s::String, pos::Int)
+    pos = skip_whitespace(s, pos)
+    start = pos
+    len = ncodeunits(s)
+    @inbounds while pos <= len
+        c = codeunit(s, pos)
+        # Break on whitespace
+        (c == 0x20 || c == 0x09) && break
+        pos += 1
+    end
+    val = parse(Float64, SubString(s, start, pos - 1))
+    return val, pos
 end
 
 """
@@ -55,36 +116,18 @@ end
 Returns information (`format_string` and `types`) needed to parse the specified
 section of the sequence file with `scanf`.
 
-The `format_string` contains the format string for `Scanf.scanf` converted
-`Scanf.Format`. The `types` field contains the types for each of the extracted
-values.
+Used only for VERSION and DEFINITIONS sections (called once each).
 """
 function get_scanf_args(section::AbstractString)
     if section == "VERSION"
-        # major, minor, revision
         format_string = "%*s %d %*s %d %*s %d"
         types = (Int, Int, Int)
     elseif section == "DEFINITIONS"
-        # AdcRasterTime, BlockDurationRaster, GradientRasterTime,
-        # RadiofrequencyRasterTime, TotalDuration
         format_string = "%*s %f %*s %f %*s %f %*s %f %*s %f"
         types = (Float64, Float64, Float64, Float64, Float64)
-    elseif section == "RF"
-        # amplitude, mag_id, phase_id, time_shape_id, delay, frequency, phase
-        format_string = "%*d %f %d %d %d %f %f %f"
-        types = (Float64, Int, Int, Int, Float64, Float64, Float64)
-    elseif section == "TRAP"
-        # amplitude, rise, flat, fall, delay
-        format_string = "%*d %f %f %f %f %f"
-        types = (Float64, Float64, Float64, Float64, Float64)
-    elseif section == "ADC"
-        # num, dwell, delay, frequency, phase
-        format_string = "%*d %d %f %f %f %f"
-        types = (Int, Float64, Float64, Float64, Float64)
     else
         error("Unknown section: $section")
     end
-
     return Scanf.Format(format_string), types
 end
 
@@ -113,7 +156,6 @@ function decode(s::Shape)
         return s
     end
 
-    # decoded_derivative = zeros(num_samples)
     decoded_shape = zeros(s.num_samples)
 
     # First sample of the compressed shape is always the actual first sample
@@ -146,5 +188,5 @@ function decode(s::Shape)
 
     end
 
-    return Shape(s.num_samples, decoded_shape)  # Return the decompressed shape
+    return Shape(s.num_samples, decoded_shape)
 end
