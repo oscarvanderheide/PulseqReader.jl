@@ -3,7 +3,8 @@ using PulseqReader
 
 import PulseqReader: decode, Shape
 
-function get_example_seq()
+# `transform` edits the file contents before they are parsed
+function get_example_seq(transform = identity)
 
     example_seq_str = """
     # Pulseq sequence file
@@ -111,7 +112,7 @@ function get_example_seq()
     """
 
     path_tmp, io_tmp = mktemp()
-    write(io_tmp, example_seq_str)
+    write(io_tmp, transform(example_seq_str))
     close(io_tmp) # Ensure data is flushed and file is closed before reading
     # Now call your original function with the temp file path
     seq = PulseqReader.read_pulseq(path_tmp) # Assuming this is your function
@@ -131,6 +132,26 @@ end
     @test seq.definitions.GradientRasterTime == 1e-5
     @test seq.definitions.RadiofrequencyRasterTime == 1e-6
     @test seq.definitions.TotalDuration == 217.6272
+end
+
+@testset "Definitions are read by key, whatever their order or extra entries" begin
+    # PyPulseq writes a three-valued FOV between the raster times; the definitions
+    # after it used to be read shifted by two values.
+    reordered = """
+    [DEFINITIONS]
+    AdcRasterTime 1e-07
+    BlockDurationRaster 1e-05
+    FOV 0.224 0.24 0.204
+    Name mrstat
+    RadiofrequencyRasterTime 2e-06
+    GradientRasterTime 2e-05
+    """
+    seq_reordered = get_example_seq(s -> replace(s, r"\[DEFINITIONS\].*?\n\n"s => reordered * "\n"))
+    @test seq_reordered.definitions.AdcRasterTime == 1e-7
+    @test seq_reordered.definitions.BlockDurationRaster == 1e-5
+    @test seq_reordered.definitions.GradientRasterTime == 2e-5
+    @test seq_reordered.definitions.RadiofrequencyRasterTime == 2e-6
+    @test isnan(seq_reordered.definitions.TotalDuration)
 end
 
 @testset "Test parsing of [BLOCKS] section" begin

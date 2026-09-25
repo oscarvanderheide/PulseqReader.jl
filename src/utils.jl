@@ -35,7 +35,7 @@ end
     get_section(lines, range, join_lines=false)
 
 Extracts non-empty, non-comment lines from the given range.
-If `join_lines` is true, joins them into a single string (for VERSION/DEFINITIONS).
+If `join_lines` is true, joins them into a single string (for VERSION).
 """
 function get_section(lines::Vector{String}, range::UnitRange{Int}, join_lines::Bool=false)
     section = [line for line in @view(lines[range]) if !is_empty_or_comment_line(line)]
@@ -116,15 +116,12 @@ end
 Returns information (`format_string` and `types`) needed to parse the specified
 section of the sequence file with `scanf`.
 
-Used only for VERSION and DEFINITIONS sections (called once each).
+Used only for the VERSION section.
 """
 function get_scanf_args(section::AbstractString)
     if section == "VERSION"
         format_string = "%*s %d %*s %d %*s %d"
         types = (Int, Int, Int)
-    elseif section == "DEFINITIONS"
-        format_string = "%*s %f %*s %f %*s %f %*s %f %*s %f"
-        types = (Float64, Float64, Float64, Float64, Float64)
     else
         error("Unknown section: $section")
     end

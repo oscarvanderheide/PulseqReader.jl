@@ -14,13 +14,25 @@ end
 """
     parse_definitions_section(lines, idx)
 
-Parses the [DEFINITIONS] section of the sequence file.
+Parses the [DEFINITIONS] section of the sequence file. Each line holds a key followed by one
+or more values, and definitions are looked up by key: their order, and definitions that are
+not stored (such as the three-valued `FOV` that PyPulseq writes), do not matter. Raster times
+that are absent take their Pulseq defaults; an absent `TotalDuration` is `NaN`.
 """
 function parse_definitions_section(lines, idx)
-    section_content = get_section(lines, idx["DEFINITIONS"], true)
-    format_string, types = get_scanf_args("DEFINITIONS")
-    _, definition_values... = scanf(section_content, format_string, types...)
-    return Definitions(definition_values...)
+    definitions = Dict{String,Vector{SubString{String}}}()
+    for line in get_section(lines, idx["DEFINITIONS"])
+        key, values... = split(line)
+        definitions[key] = values
+    end
+    value(key, default) = haskey(definitions, key) ? parse(Float64, only(definitions[key])) : default
+    return Definitions(
+        value("AdcRasterTime", 1e-7),
+        value("BlockDurationRaster", 1e-5),
+        value("GradientRasterTime", 1e-5),
+        value("RadiofrequencyRasterTime", 1e-6),
+        value("TotalDuration", NaN),
+    )
 end
 
 """
